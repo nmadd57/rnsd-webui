@@ -1,6 +1,7 @@
 """The aiohttp application: JSON API, server-sent announce stream, and the static page."""
 import asyncio
 import json
+import logging
 import re
 import secrets
 from pathlib import Path
@@ -208,8 +209,12 @@ def make_app(backend, creds: Credentials, version="0.1.2", demo=False, sessions=
             host, port, https_port = http_redirect
             runner = web.AppRunner(make_redirect_app(https_port))
             await runner.setup()
-            await web.TCPSite(runner, host, port).start()
-            redirect_runner.append(runner)
+            try:
+                await web.TCPSite(runner, host, port).start()
+                redirect_runner.append(runner)
+            except OSError as exc:       # something else already uses the port: HTTPS still works, so carry on
+                logging.getLogger("rnsd-webui").warning("could not listen on port %s for the HTTP redirect: %s", port, exc)
+                await runner.cleanup()
 
     async def on_cleanup(a):
         for runner in redirect_runner:

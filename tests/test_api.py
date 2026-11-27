@@ -106,3 +106,14 @@ async def test_the_http_redirect_refuses_odd_host_headers(aiohttp_client):
     for bad in ("evil.com/@x", "x;y", "-bad-.com", "a..b"):
         r = await c.get("/", headers={"Host": bad}, allow_redirects=False)
         assert r.status == 400, bad
+
+
+async def test_a_busy_redirect_port_does_not_stop_the_server(aiohttp_client, backend, creds, sessions, unused_tcp_port):
+    import socket
+    from rnsd_webui.app import make_app
+    busy = socket.socket(); busy.bind(("127.0.0.1", unused_tcp_port)); busy.listen(1)
+    try:
+        c = await aiohttp_client(make_app(backend, creds, "t", demo=True, sessions=sessions, http_redirect=("127.0.0.1", unused_tcp_port, 443)))
+        assert (await c.get("/api/session")).status == 200
+    finally:
+        busy.close()
