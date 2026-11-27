@@ -45,7 +45,7 @@ To try the interface without a daemon, `rnsd-webui --demo` serves made-up data.
 ### Reaching it from another device
 
 The default is to listen on `127.0.0.1` only. To use it from your network, listen on `0.0.0.0:8080` **and use HTTPS**: pass
-`--tls-cert` and `--tls-key`, or put it behind a reverse proxy that terminates TLS (it honours `X-Forwarded-Proto`). Without TLS,
+`--tls-cert` and `--tls-key` (add `--http-redirect 80` to send plain `http://` visitors on to HTTPS), or put it behind a reverse proxy that terminates TLS (it honours `X-Forwarded-Proto`). Without TLS,
 the password and the session cookie cross the network in clear text, and the program says so when you start it that way.
 
 ## Security notes

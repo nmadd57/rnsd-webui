@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rnsd-webui"
-version = "0.1.1"
+version = "0.1.2"
 description = "A small web interface for a running Reticulum daemon (rnsd): interfaces, paths, announces and a few tools."
 readme = "README.md"
 license = { text = "MIT" }

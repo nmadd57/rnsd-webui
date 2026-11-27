@@ -28,6 +28,7 @@ def parser():
     ap.add_argument("--data-dir", default=None, help="where the password hash and this interface's own identity are kept")
     ap.add_argument("--tls-cert", default=None)
     ap.add_argument("--tls-key", default=None)
+    ap.add_argument("--http-redirect", type=int, default=None, metavar="PORT", help="also listen on this plain HTTP port (usually 80) and redirect to HTTPS; needs --tls-cert")
     ap.add_argument("--demo", action="store_true", help="serve made-up data instead of talking to rnsd (to try the interface)")
     ap.add_argument("--version", action="version", version=f"rnsd-webui {__version__}")
     return ap
@@ -88,7 +89,14 @@ def main(argv=None):
         log.warning("listening on %s without TLS: the password and session cookie cross the network in clear text. "
                     "Use --tls-cert/--tls-key or put it behind a TLS proxy.", host)
 
-    web.run_app(make_app(backend, creds, __version__, demo=a.demo), host=host or "127.0.0.1", port=port, ssl_context=tls,
+    redirect = None
+    if a.http_redirect:
+        if not a.tls_cert:
+            print("--http-redirect only makes sense with --tls-cert", file=sys.stderr)
+            return 2
+        redirect = (host or "127.0.0.1", a.http_redirect, port)
+
+    web.run_app(make_app(backend, creds, __version__, demo=a.demo, http_redirect=redirect), host=host or "127.0.0.1", port=port, ssl_context=tls,
                 print=lambda s: log.info(s.strip()), handle_signals=True)
     return 0
 

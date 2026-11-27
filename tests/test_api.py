@@ -86,3 +86,23 @@ async def test_announce_buffer_and_live_stream(authed, backend):
     event = [l for l in got.decode().splitlines() if l.startswith("data: ")][-1][6:]
     assert json.loads(event)["destination"] == "bb" * 16
     resp.close()
+
+
+async def test_the_http_redirect_sends_browsers_to_https(aiohttp_client):
+    from rnsd_webui.app import make_redirect_app
+    c = await aiohttp_client(make_redirect_app(443))
+    r = await c.get("/some/page?x=1", headers={"Host": "bobcat04.example.com"}, allow_redirects=False)
+    assert r.status == 308 and r.headers["Location"] == "https://bobcat04.example.com/some/page?x=1"
+    r = await c.get("/", headers={"Host": "node.local:80"}, allow_redirects=False)
+    assert r.headers["Location"] == "https://node.local/"
+    c2 = await aiohttp_client(make_redirect_app(8443))
+    r = await c2.get("/", headers={"Host": "node.local"}, allow_redirects=False)
+    assert r.headers["Location"] == "https://node.local:8443/"
+
+
+async def test_the_http_redirect_refuses_odd_host_headers(aiohttp_client):
+    from rnsd_webui.app import make_redirect_app
+    c = await aiohttp_client(make_redirect_app(443))
+    for bad in ("evil.com/@x", "x;y", "-bad-.com", "a..b"):
+        r = await c.get("/", headers={"Host": bad}, allow_redirects=False)
+        assert r.status == 400, bad

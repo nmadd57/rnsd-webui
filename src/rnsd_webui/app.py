@@ -1,6 +1,7 @@
 """The aiohttp application: JSON API, server-sent announce stream, and the static page."""
 import asyncio
 import json
+import re
 import secrets
 from pathlib import Path
 
@@ -162,7 +163,24 @@ async def index(request):
     return web.FileResponse(STATIC / "index.html")
 
 
-def make_app(backend, creds: Credentials, version="0.1.0", demo=False, sessions=None):
+HOST_RE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\])$")
+
+
+def make_redirect_app(https_port):
+    """A tiny app for plain HTTP: it only sends the browser on to the same address over HTTPS."""
+    async def redirect(request):
+        host = request.host.rsplit(":", 1)[0] if not request.host.endswith("]") else request.host
+        if not host or not HOST_RE.match(host):
+            raise web.HTTPBadRequest(text="bad host")
+        netloc = host if https_port == 443 else f"{host}:{https_port}"
+        raise web.HTTPPermanentRedirect(f"https://{netloc}{request.rel_url}")
+
+    app = web.Application()
+    app.router.add_route("*", "/{tail:.*}", redirect)
+    return app
+
+
+def make_app(backend, creds: Credentials, version="0.1.2", demo=False, sessions=None, http_redirect=None):
     app = web.Application(middlewares=[security, authenticate], client_max_size=64 * 1024)
     app[K_BACKEND], app[K_CREDS], app[K_SESSIONS] = backend, creds, sessions or Sessions()
     app[K_VERSION], app[K_DEMO] = version, demo
@@ -183,9 +201,22 @@ def make_app(backend, creds: Credentials, version="0.1.0", demo=False, sessions=
     async def on_startup(a):
         a[K_BACKEND].bind_loop(asyncio.get_running_loop())
 
+    redirect_runner = []
+
+    async def start_redirect(a):
+        if http_redirect:
+            host, port, https_port = http_redirect
+            runner = web.AppRunner(make_redirect_app(https_port))
+            await runner.setup()
+            await web.TCPSite(runner, host, port).start()
+            redirect_runner.append(runner)
+
     async def on_cleanup(a):
+        for runner in redirect_runner:
+            await runner.cleanup()
         a[K_BACKEND].close()
 
     app.on_startup.append(on_startup)
+    app.on_startup.append(start_redirect)
     app.on_cleanup.append(on_cleanup)
     return app
