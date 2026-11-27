@@ -18,15 +18,34 @@ def hash_password(password: str, salt: bytes = None) -> str:
     return f"scrypt${SCRYPT['n']}${SCRYPT['r']}${SCRYPT['p']}${salt.hex()}${dk.hex()}"
 
 
+PBKDF2_MAX_ITERATIONS = 2_000_000          # an upper bound so a stored hash cannot be used to make the login burn CPU
+
+
+def pbkdf2_hash(password: str, salt: bytes = None, iterations: int = 200_000) -> str:
+    """The format a browser can produce with WebCrypto (PBKDF2-HMAC-SHA256), used when the hash is made elsewhere,
+    for example by a web page that sets this interface up: pbkdf2-sha256$<iterations>$<salt hex>$<hash hex>."""
+    salt = salt or os.urandom(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, iterations, dklen=32)
+    return f"pbkdf2-sha256${iterations}${salt.hex()}${dk.hex()}"
+
+
 def verify_password(password: str, stored: str) -> bool:
     try:
-        scheme, n, r, p, salt, dk = stored.split("$")
-        if scheme != "scrypt":
-            return False
-        got = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=int(n), r=int(r), p=int(p), dklen=len(dk) // 2)
-        return hmac.compare_digest(got.hex(), dk)
+        parts = stored.split("$")
+        if parts[0] == "scrypt" and len(parts) == 6:
+            _, n, r, p, salt, dk = parts
+            got = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=int(n), r=int(r), p=int(p), dklen=len(dk) // 2)
+            return hmac.compare_digest(got.hex(), dk)
+        if parts[0] == "pbkdf2-sha256" and len(parts) == 4:
+            _, iterations, salt, dk = parts
+            iterations = int(iterations)
+            if not 1 <= iterations <= PBKDF2_MAX_ITERATIONS:
+                return False
+            got = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), iterations, dklen=len(dk) // 2)
+            return hmac.compare_digest(got.hex(), dk)
     except (ValueError, TypeError):
-        return False
+        pass
+    return False
 
 
 class Credentials:
@@ -39,11 +58,17 @@ class Credentials:
         return self.path.exists()
 
     def set_password(self, password: str) -> None:
+        self.set_hash(hash_password(password))
+
+    def set_hash(self, stored: str) -> None:
+        """Store a hash made elsewhere (scrypt or pbkdf2-sha256 format)."""
+        if stored.split("$")[0] not in ("scrypt", "pbkdf2-sha256"):
+            raise ValueError("unknown password hash format")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(".tmp")
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
-            json.dump({"password": hash_password(password)}, f)
+            json.dump({"password": stored}, f)
         os.replace(tmp, self.path)
 
     def check(self, password: str) -> bool:

@@ -31,7 +31,8 @@ rnsd-webui --rns-config /etc/reticulum --listen 127.0.0.1:8080
 ```
 
 The first time it runs it creates a random login password and **prints it once in the log**. Change it with
-`rnsd-webui set-password`. The password hash is kept in the data directory (`/var/lib/rnsd-webui` as root,
+`rnsd-webui set-password`. (A hash made elsewhere can be stored with `echo 'pbkdf2-sha256$...' | rnsd-webui set-hash`; the format
+is `pbkdf2-sha256$<iterations>$<salt hex>$<hash hex>`, which a browser can make with WebCrypto.) The password hash is kept in the data directory (`/var/lib/rnsd-webui` as root,
 `~/.local/share/rnsd-webui` otherwise) in a file only its owner can read, next to this interface's own Reticulum identity.
 
 To try the interface without a daemon, `rnsd-webui --demo` serves made-up data.

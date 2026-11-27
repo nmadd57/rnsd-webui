@@ -1,4 +1,5 @@
-"""Command line: `rnsd-webui` serves the interface; `rnsd-webui set-password` changes the login password."""
+"""Command line: `rnsd-webui` serves the interface; `rnsd-webui set-password` changes the login password;
+`rnsd-webui set-hash` reads a ready-made hash (scrypt or pbkdf2-sha256) from standard input."""
 import argparse
 import getpass
 import logging
@@ -21,7 +22,7 @@ def default_data_dir():
 
 def parser():
     ap = argparse.ArgumentParser(prog="rnsd-webui", description="A web interface for a running Reticulum daemon (rnsd).")
-    ap.add_argument("command", nargs="?", choices=["serve", "set-password"], default="serve")
+    ap.add_argument("command", nargs="?", choices=["serve", "set-password", "set-hash"], default="serve")
     ap.add_argument("--listen", default="127.0.0.1:8080", help="address:port to listen on (default 127.0.0.1:8080)")
     ap.add_argument("--rns-config", default=None, help="Reticulum config directory (default: the standard one, e.g. /etc/reticulum)")
     ap.add_argument("--data-dir", default=None, help="where the password hash and this interface's own identity are kept")
@@ -46,6 +47,16 @@ def main(argv=None):
             return 1
         creds.set_password(pw)
         print("Password changed.")
+        return 0
+
+    if a.command == "set-hash":
+        stored = sys.stdin.readline().strip()
+        try:
+            creds.set_hash(stored)
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        print("Password hash stored.")
         return 0
 
     first = creds.ensure()
