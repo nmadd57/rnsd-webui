@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rnsd web interface</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>rnsd <small id="who"></small></h1>
+    <button id="logout" type="button" class="quiet" hidden>Sign out</button>
+  </header>
+
+  <section id="login" class="card" hidden>
+    <h2>Sign in</h2>
+    <form id="loginForm" autocomplete="on">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="btns"><button class="primary" type="submit">Sign in</button></div>
+      <div id="loginMsg" class="msg bad" role="alert"></div>
+    </form>
+  </section>
+
+  <main id="app" hidden>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#dashboard" data-tab="dashboard">Dashboard</a>
+      <a href="#paths" data-tab="paths">Paths</a>
+      <a href="#announces" data-tab="announces">Announces</a>
+      <a href="#tools" data-tab="tools">Tools</a>
+    </nav>
+
+    <section id="tab-dashboard" class="tab">
+      <div class="card">
+        <h2>Transport</h2>
+        <dl class="kv" id="transport"></dl>
+      </div>
+      <div class="card">
+        <h2>Traffic</h2>
+        <dl class="kv" id="totals"></dl>
+      </div>
+      <h2 class="sect">Interfaces</h2>
+      <div id="interfaces" class="stack"></div>
+    </section>
+
+    <section id="tab-paths" class="tab" hidden>
+      <div class="card">
+        <div class="row"><label for="pathFilter">Filter</label><input id="pathFilter" type="search" placeholder="hash, via or interface" autocapitalize="none" spellcheck="false"></div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Destination</th><th>Hops</th><th>Via</th><th>Interface</th><th>Expires</th><th></th></tr></thead>
+          <tbody id="pathRows"></tbody>
+        </table></div>
+        <p class="hint" id="pathCount"></p>
+      </div>
+    </section>
+
+    <section id="tab-announces" class="tab" hidden>
+      <div class="card">
+        <div class="row"><label for="annFilter">Filter</label><input id="annFilter" type="search" placeholder="hash or text" autocapitalize="none" spellcheck="false"></div>
+        <p class="hint" id="annState">Connecting...</p>
+        <div id="annList" class="stack"></div>
+      </div>
+    </section>
+
+    <section id="tab-tools" class="tab" hidden>
+      <div class="card">
+        <h2>Announce this interface</h2>
+        <p class="hint">Announces a destination owned by this web interface (<code id="selfName"></code>) so other nodes see it. Its hash:</p>
+        <p><code id="selfHash" class="break"></code></p>
+        <form id="announceForm">
+          <label for="announceData">Announce text (optional, up to 300 bytes)</label>
+          <input id="announceData" type="text" maxlength="300" autocomplete="off">
+          <div class="btns"><button class="primary" type="submit">Announce</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Request a path</h2>
+        <p class="hint">Asks the network how to reach a destination you do not have a path to yet.</p>
+        <form id="pathForm">
+          <label for="pathHash">Destination hash (32 hex characters)</label>
+          <input id="pathHash" type="text" pattern="[0-9a-fA-F]{32}" maxlength="32" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. 0123456789abcdef0123456789abcdef">
+          <div class="btns"><button class="primary" type="submit">Request path</button></div>
+        </form>
+      </div>
+      <div id="toolMsg" class="msg" role="status"></div>
+    </section>
+  </main>
+
+  <footer id="foot"></footer>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

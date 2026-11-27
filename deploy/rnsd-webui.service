@@ -1,0 +1,30 @@
+[Unit]
+Description=Web interface for rnsd
+Documentation=https://github.com/nmadd57/rnsd-webui
+After=network-online.target rnsd.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust the paths to where you installed it and where your Reticulum config lives.
+ExecStart=/opt/rnsd-webui/venv/bin/rnsd-webui --listen 0.0.0.0:8080 --rns-config /etc/reticulum --data-dir /var/lib/rnsd-webui
+Restart=on-failure
+RestartSec=10
+StateDirectory=rnsd-webui
+StateDirectoryMode=0700
+
+# The Reticulum client needs to read the shared-instance key in the config directory, so this runs as root;
+# keep the rest of the system out of reach.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/etc/reticulum /var/lib/rnsd-webui
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target
