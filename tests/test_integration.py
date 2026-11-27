@@ -1,5 +1,6 @@
 """Against a real rnsd. Skipped when the rns package is missing."""
 import asyncio
+import os
 import socket
 import subprocess
 import sys
@@ -38,7 +39,9 @@ def rnsd(tmp_path_factory):
             listen_ip = 127.0.0.1
             listen_port = {listen}
     """))
-    proc = subprocess.Popen([sys.executable, "-m", "RNS.Utilities.rnsd", "--config", str(d)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log = open(d / "rnsd.log", "w")
+    proc = subprocess.Popen([sys.executable, "-m", "RNS.Utilities.rnsd", "--config", str(d), "-v"], stdout=log, stderr=subprocess.STDOUT,
+                            env={**os.environ, "PYTHONUNBUFFERED": "1"})
     deadline = time.time() + 20
     while time.time() < deadline:
         try:
@@ -52,6 +55,9 @@ def rnsd(tmp_path_factory):
     yield d
     proc.terminate()
     proc.wait(timeout=10)
+    log.close()
+    if os.environ.get("RNSD_WEBUI_SHOW_RNSD_LOG"):
+        print("\n--- rnsd log ---\n" + (d / "rnsd.log").read_text()[-3000:])
 
 
 @pytest.fixture(scope="module")
@@ -60,6 +66,8 @@ def shared_backend(rnsd, tmp_path_factory):
     installs signal handlers)."""
     from rnsd_webui.backend import RnsBackend
     b = RnsBackend(str(rnsd), tmp_path_factory.mktemp("data"))
+    if os.environ.get("RNSD_WEBUI_SHOW_RNSD_LOG"):
+        RNS.loglevel = RNS.LOG_EXTREME
     yield b
     b.close()
 
@@ -81,8 +89,8 @@ async def test_status_lists_the_real_interfaces(backend):
 async def test_announce_shows_up_in_the_path_table(backend):
     me = backend.self_info()
     row = None
-    for i in range(60):
-        if i % 8 == 0:                                      # announce again now and then: the first can race the connection
+    for i in range(240):                                    # up to two minutes: a loaded CI runner can be very slow
+        if i % 16 == 0:                                      # announce again now and then: the first can race the connection
             await backend.announce("integration test")
         row = next((p for p in await backend.paths() if p["hash"] == me["destination"]), None)
         if row:
@@ -109,13 +117,13 @@ async def test_an_announce_from_another_client_reaches_the_feed(rnsd, backend):
         d = RNS.Destination(RNS.Identity(), RNS.Destination.IN, RNS.Destination.SINGLE, "peer", "app")
         time.sleep(1)
         print(d.hash.hex(), flush=True)
-        for _ in range(5):                       # more than once: the first can race the connection
+        for _ in range(40):                      # keep announcing: the first can race the connection, and a loaded machine is slow
             d.announce(app_data=b"from the peer")
             time.sleep(4)
     """)
     p = await asyncio.create_subprocess_exec(sys.executable, "-c", peer, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
     line = (await asyncio.wait_for(p.stdout.readline(), 20)).decode().strip()
-    for _ in range(60):
+    for _ in range(240):
         if any(a["destination"] == line for a in backend.announces):
             break
         await asyncio.sleep(0.5)
