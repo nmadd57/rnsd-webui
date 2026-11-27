@@ -80,17 +80,18 @@ async def test_status_lists_the_real_interfaces(backend):
 
 async def test_announce_shows_up_in_the_path_table(backend):
     me = backend.self_info()
-    await backend.announce("integration test")
-    for _ in range(60):
-        paths = await backend.paths()
-        if any(p["hash"] == me["destination"] for p in paths):
+    row = None
+    for i in range(60):
+        if i % 8 == 0:                                      # announce again now and then: the first can race the connection
+            await backend.announce("integration test")
+        row = next((p for p in await backend.paths() if p["hash"] == me["destination"]), None)
+        if row:
             break
         await asyncio.sleep(0.5)
-    row = next(p for p in paths if p["hash"] == me["destination"])
-    assert row["hops"] == 0 and row["interface"]
+    assert row and row["hops"] == 0 and row["interface"]
 
 
-async def test_the_identity_is_stored_privately(backend):
+def test_the_identity_is_stored_privately(backend):
     import os
     import stat
     path = [p for p in __import__("pathlib").Path(backend.identity_path).parent.glob("identity")][0]
@@ -107,9 +108,10 @@ async def test_an_announce_from_another_client_reaches_the_feed(rnsd, backend):
         r = RNS.Reticulum(configdir={str(rnsd)!r}, require_shared_instance=True)
         d = RNS.Destination(RNS.Identity(), RNS.Destination.IN, RNS.Destination.SINGLE, "peer", "app")
         time.sleep(1)
-        d.announce(app_data=b"from the peer")
         print(d.hash.hex(), flush=True)
-        time.sleep(15)
+        for _ in range(5):                       # more than once: the first can race the connection
+            d.announce(app_data=b"from the peer")
+            time.sleep(4)
     """)
     p = await asyncio.create_subprocess_exec(sys.executable, "-c", peer, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
     line = (await asyncio.wait_for(p.stdout.readline(), 20)).decode().strip()

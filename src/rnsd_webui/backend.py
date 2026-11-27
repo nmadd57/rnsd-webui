@@ -54,11 +54,15 @@ class BaseBackend:
     def record_announce(self, entry):
         """Safe to call from any thread."""
         def deliver():
-            # Reticulum can report the same announce twice in a row, once without its data: keep the one with data.
+            # Reticulum can report the same announce twice in a row, once without its data (in either order): keep one,
+            # the one with the data.
             if self.announces:
                 last = self.announces[0]
-                if (last["destination"] == entry["destination"] and entry["time"] - last["time"] < 3
-                        and not (last["app_data"] or {}).get("hex") and (entry["app_data"] or {}).get("hex")):
+                same = last["destination"] == entry["destination"] and abs(entry["time"] - last["time"]) < 3
+                last_has, new_has = bool((last["app_data"] or {}).get("hex")), bool((entry["app_data"] or {}).get("hex"))
+                if same and not new_has and last_has:
+                    return
+                if same and new_has and not last_has:
                     self.announces.popleft()
             self.announces.appendleft(entry)
             for q in list(self.subscribers):
