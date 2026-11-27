@@ -117,7 +117,10 @@ async def test_an_announce_from_another_client_reaches_the_feed(rnsd, backend):
         if any(a["destination"] == line for a in backend.announces):
             break
         await asyncio.sleep(0.5)
-    p.kill()
+    try:
+        p.kill()
+    except ProcessLookupError:
+        pass                                        # it had already finished
     await p.wait()
     got = [a for a in backend.announces if a["destination"] == line]
     assert got and got[0]["app_data"]["text"] == "from the peer"
