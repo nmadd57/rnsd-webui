@@ -124,7 +124,7 @@ async def test_an_announce_from_another_client_reaches_the_feed(rnsd, backend):
     p = await asyncio.create_subprocess_exec(sys.executable, "-c", peer, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
     line = (await asyncio.wait_for(p.stdout.readline(), 20)).decode().strip()
     for _ in range(240):
-        if any(a["destination"] == line for a in backend.announces):
+        if any(a["destination"] == line and a["app_data"]["text"] == "from the peer" for a in backend.announces):
             break
         await asyncio.sleep(0.5)
     try:
